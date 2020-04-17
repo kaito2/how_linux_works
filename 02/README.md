@@ -1,47 +1,6 @@
-## Execute
+## 2章 ユーザーモードで実現する機能
 
 ```
-$ gcc -o hello hello.c
-$ ./hello
-hello world
-$ sudo dtruss ./hello
-...
-# エラーになるはず
-```
-
-本書に書かれている `strace` を Mac で再現するには `dtruss` を使用する必要がある。
-
-しかし、 `dtruss` を使用するためには以下のリンクのような設定を行う必要があるらしい。
-
-リカバリモードで起動するまでやりたくないので今回はスキップ!!!
-
-[dtrussでgolangのシステムコールをトレースしたい - Qiita](https://qiita.com/yurakawa/items/2ab084a2f3f0aa0bf0c7)
-
-
-```
-$ docker run --rm -it ubuntu:18.04 /bin/bash
-# apt-get update
-# apt-get install sysstat
-# sar -P ALL 1
-Linux 4.9.184-linuxkit (048be7bc09e0) 	04/17/20 	_x86_64_	(6 CPU)
-
-13:25:21        CPU     %user     %nice   %system   %iowait    %steal     %idle
-13:25:22        all      0.71      0.00      3.88      9.35      0.00     86.07
-13:25:22          0      0.00      0.00      0.00      0.00      0.00    100.00
-13:25:22          1      1.02      0.00      3.06      0.00      0.00     95.92
-13:25:22          2      0.00      0.00     12.90     56.99      0.00     30.11
-13:25:22          3      1.03      0.00      3.09      0.00      0.00     95.88
-13:25:22          4      1.06      0.00      1.06      0.00      0.00     97.87
-13:25:22          5      1.04      0.00      3.12      0.00      0.00     95.83
-...
-
-
-```
-
-## 仕切り直し
-
-```
-$ docker build -t sandbox .
 $ docker run --rm -it -v `pwd`:/workspace sandbox
 ```
 
@@ -80,6 +39,8 @@ $ kill 890
 
 p.20
 
+`ppidloop.c` のコードはシステムコールを呼ぶため、 `%system` の値が先程より大きくなっている。
+
 ```
 $ cc -o ppidloop ppidloop.c
 $ ./ppidloop &
@@ -106,3 +67,41 @@ Average:          4     63.00      0.00     37.00      0.00      0.00      0.00
 Average:          5      2.08      0.00      3.12      0.00      0.00     94.79
 $ kill 904
 ```
+
+p.22
+
+```
+$ strace -T -o hello.log ./hello
+hello world
+$ cat hello.log
+execve("./hello", ["./hello"], 0x7ffc2d235fb8 /* 8 vars */) = 0 <0.001987>
+brk(NULL)                               = 0x564446818000 <0.000021>
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory) <0.000022>
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory) <0.000025>
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3 <0.000028>
+fstat(3, {st_mode=S_IFREG|0644, st_size=13078, ...}) = 0 <0.000021>
+mmap(NULL, 13078, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f5a016c6000 <0.000025>
+close(3)                                = 0 <0.000021>
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory) <0.000020>
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3 <0.000039>
+read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\260\34\2\0\0\0\0\0"..., 832) = 832 <0.000026>
+fstat(3, {st_mode=S_IFREG|0755, st_size=2030544, ...}) = 0 <0.000022>
+mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f5a016c4000 <0.000034>
+mmap(NULL, 4131552, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f5a010b2000 <0.000027>
+mprotect(0x7f5a01299000, 2097152, PROT_NONE) = 0 <0.000025>
+mmap(0x7f5a01499000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1e7000) = 0x7f5a01499000 <0.000060>
+mmap(0x7f5a0149f000, 15072, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f5a0149f000 <0.000034>
+close(3)                                = 0 <0.000018>
+arch_prctl(ARCH_SET_FS, 0x7f5a016c54c0) = 0 <0.000017>
+mprotect(0x7f5a01499000, 16384, PROT_READ) = 0 <0.000025>
+mprotect(0x564444e68000, 4096, PROT_READ) = 0 <0.000018>
+mprotect(0x7f5a016ca000, 4096, PROT_READ) = 0 <0.000020>
+munmap(0x7f5a016c6000, 13078)           = 0 <0.000024>
+fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 0), ...}) = 0 <0.000019>
+brk(NULL)                               = 0x564446818000 <0.000018>
+brk(0x564446839000)                     = 0x564446839000 <0.000023>
+write(1, "hello world\n", 12)           = 12 <0.000046>
+exit_group(0)                           = ?
++++ exited with 0 +++
+```
+
